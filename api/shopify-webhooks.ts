@@ -1,46 +1,38 @@
-import crypto from "crypto";
-import { IncomingMessage, ServerResponse } from "http";
-
 export const config = {
-  api: {
-    bodyParser: false,
-  },
+  runtime: "nodejs",
 };
 
+import crypto from "crypto";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+
 export default async function handler(
-  req: IncomingMessage & { body?: any },
-  res: ServerResponse
+  req: VercelRequest,
+  res: VercelResponse
 ) {
-  const chunks: Buffer[] = [];
+  if (req.method !== "POST") {
+    return res.status(405).send("Method Not Allowed");
+  }
 
-  req.on("data", (chunk) => chunks.push(chunk));
-  req.on("end", () => {
-    const rawBody = Buffer.concat(chunks).toString("utf8");
-    const hmac = req.headers["x-shopify-hmac-sha256"] as string;
+  const hmac = req.headers["x-shopify-hmac-sha256"] as string;
+  if (!hmac) {
+    return res.status(401).send("Missing HMAC");
+  }
 
-    if (!hmac) {
-      res.statusCode = 401;
-      res.end("Missing HMAC");
-      return;
-    }
+  const rawBody = JSON.stringify(req.body);
 
-    const digest = crypto
-      .createHmac("sha256", process.env.SHOPIFY_API_SECRET!)
-      .update(rawBody)
-      .digest("base64");
+  const digest = crypto
+    .createHmac("sha256", process.env.SHOPIFY_API_SECRET as string)
+    .update(rawBody, "utf8")
+    .digest("base64");
 
-    const valid = crypto.timingSafeEqual(
-      Buffer.from(digest),
-      Buffer.from(hmac)
-    );
+  const valid = crypto.timingSafeEqual(
+    Buffer.from(digest),
+    Buffer.from(hmac)
+  );
 
-    if (!valid) {
-      res.statusCode = 401;
-      res.end("Invalid HMAC");
-      return;
-    }
+  if (!valid) {
+    return res.status(401).send("Invalid HMAC");
+  }
 
-    res.statusCode = 200;
-    res.end("OK");
-  });
+  return res.status(200).send("OK");
 }
