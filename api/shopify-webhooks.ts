@@ -3,27 +3,30 @@ export const config = {
 };
 
 import crypto from "crypto";
-import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
+export default async function handler(req: any, res: any) {
   if (req.method !== "POST") {
-    return res.status(405).send("Method Not Allowed");
+    res.statusCode = 405;
+    return res.end("Method Not Allowed");
   }
 
-  const hmac = req.headers["x-shopify-hmac-sha256"] as string;
+  const hmac = req.headers["x-shopify-hmac-sha256"];
   if (!hmac) {
-    return res.status(401).send("Missing HMAC");
+    res.statusCode = 401;
+    return res.end("Missing HMAC");
   }
 
-  const rawBody = JSON.stringify(req.body);
+  const rawBody = JSON.stringify(req.body ?? {});
 
   const digest = crypto
-    .createHmac("sha256", process.env.SHOPIFY_API_SECRET as string)
+    .createHmac("sha256", process.env.SHOPIFY_API_SECRET!)
     .update(rawBody, "utf8")
     .digest("base64");
+
+  if (digest.length !== hmac.length) {
+    res.statusCode = 401;
+    return res.end("Invalid HMAC");
+  }
 
   const valid = crypto.timingSafeEqual(
     Buffer.from(digest),
@@ -31,8 +34,14 @@ export default async function handler(
   );
 
   if (!valid) {
-    return res.status(401).send("Invalid HMAC");
+    res.statusCode = 401;
+    return res.end("Invalid HMAC");
   }
 
-  return res.status(200).send("OK");
+  res.statusCode = 200;
+  return res.end("OK");
 }
+
+
+
+
