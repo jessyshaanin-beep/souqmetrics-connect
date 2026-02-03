@@ -2,7 +2,7 @@
 
 client_id = "b6a6c785d64593d4fbabf601f3b885c2"
 name = "SouqMetrics"
-application_url = "https://souqmetrics-landingpage--jessyshaanin.replit.app"
+application_url = "https://souq-metrics-shopify.vercel.app"
 embedded = false
 
 [build]
@@ -12,12 +12,16 @@ automatically_update_urls_on_dev = true
 api_version = "2026-01"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
-
-  [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -30,12 +34,3 @@ redirect_urls = [ ]
 
 [app_preferences]
 url = "https://frgzxxszpzclhnkgmkuw.supabase.co/functions/v1/shopify-callback"
-
-[[webhooks.subscriptions]]
-compliance_topics = [
-  "customers/data_request",
-  "customers/redact",
-  "shop/redact"
-]
-uri = "/webhooks"
-
