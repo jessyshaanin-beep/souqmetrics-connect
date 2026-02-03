@@ -1,0 +1,41 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "b6a6c785d64593d4fbabf601f3b885c2"
+name = "SouqMetrics"
+application_url = "https://souqmetrics-landingpage--jessyshaanin.replit.app"
+embedded = false
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-01"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,read_orders,read_products"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ ]
+
+[app_preferences]
+url = "https://frgzxxszpzclhnkgmkuw.supabase.co/functions/v1/shopify-callback"
+
+[[webhooks.subscriptions]]
+compliance_topics = [
+  "customers/data_request",
+  "customers/redact",
+  "shop/redact"
+]
+uri = "/webhooks"
+
