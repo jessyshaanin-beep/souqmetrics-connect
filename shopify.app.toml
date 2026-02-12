@@ -1,7 +1,7 @@
 client_id = "b6a6c785d64593d4fbabf601f3b885c2"
 name = "SouqMetrics"
 application_url = "https://souqmetrics.co"
-embedded = false
+embedded = true
 
 [build]
 automatically_update_urls_on_dev = true
@@ -36,5 +36,5 @@ redirect_urls = [
 ]
 
 [app_preferences]
-url = "https://souqmetrics.co"
+url = "https://app.souqmetrics.co/#/overview"
 
