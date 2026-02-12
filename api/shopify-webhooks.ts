@@ -1,47 +1,59 @@
-export const config = {
-  runtime: "nodejs",
-};
-
 import crypto from "crypto";
 
-export default async function handler(req: any, res: any) {
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+export default function handler(req: any, res: any) {
   if (req.method !== "POST") {
     res.statusCode = 405;
-    return res.end("Method Not Allowed");
+    res.end("Method Not Allowed");
+    return;
   }
 
   const hmac = req.headers["x-shopify-hmac-sha256"];
   if (!hmac) {
     res.statusCode = 401;
-    return res.end("Missing HMAC");
+    res.end("Missing HMAC");
+    return;
   }
 
-  const rawBody = JSON.stringify(req.body ?? {});
+  const chunks: Buffer[] = [];
 
-  const digest = crypto
-    .createHmac("sha256", process.env.SHOPIFY_API_SECRET!)
-    .update(rawBody, "utf8")
-    .digest("base64");
+  req.on("data", (chunk: Buffer) => {
+    chunks.push(chunk);
+  });
 
-  if (digest.length !== hmac.length) {
-    res.statusCode = 401;
-    return res.end("Invalid HMAC");
-  }
+  req.on("end", () => {
+    const rawBody = Buffer.concat(chunks).toString("utf8");
 
-  const valid = crypto.timingSafeEqual(
-    Buffer.from(digest),
-    Buffer.from(hmac)
-  );
+    const digest = crypto
+      .createHmac("sha256", process.env.SHOPIFY_API_SECRET!)
+      .update(rawBody, "utf8")
+      .digest("base64");
 
-  if (!valid) {
-    res.statusCode = 401;
-    return res.end("Invalid HMAC");
-  }
+    if (digest.length !== hmac.length) {
+      res.statusCode = 401;
+      res.end("Invalid HMAC");
+      return;
+    }
 
-  res.statusCode = 200;
-  return res.end("OK");
+    const valid = crypto.timingSafeEqual(
+      Buffer.from(digest),
+      Buffer.from(hmac)
+    );
+
+    if (!valid) {
+      res.statusCode = 401;
+      res.end("Invalid HMAC");
+      return;
+    }
+
+    res.statusCode = 200;
+    res.end("OK");
+  });
 }
-
-
 
 

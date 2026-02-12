@@ -1,0 +1,69 @@
+<script>
+(function () {
+
+  function getParam(name) {
+    const url = new URL(window.location.href);
+    return url.searchParams.get(name);
+  }
+
+  const params = {
+    utm_source: getParam("utm_source"),
+    utm_medium: getParam("utm_medium"),
+    utm_campaign: getParam("utm_campaign"),
+    utm_content: getParam("utm_content"),
+    utm_term: getParam("utm_term"),
+    gclid: getParam("gclid"),
+    fbclid: getParam("fbclid"),
+    ttclid: getParam("ttclid")
+  };
+
+  // Detect platform automatically if no utm_source
+  let detectedSource = params.utm_source;
+
+  if (!detectedSource) {
+    if (params.gclid) detectedSource = "google";
+    else if (params.fbclid) detectedSource = "meta";
+    else if (params.ttclid) detectedSource = "tiktok";
+  }
+
+  const attribution = {
+    source: detectedSource || null,
+    medium: params.utm_medium || null,
+    campaign: params.utm_campaign || null,
+    content: params.utm_content || null,
+    term: params.utm_term || null,
+    gclid: params.gclid || null,
+    fbclid: params.fbclid || null,
+    ttclid: params.ttclid || null
+  };
+
+  // Only store if something meaningful exists
+  if (attribution.source || attribution.gclid || attribution.fbclid || attribution.ttclid) {
+    localStorage.setItem("souqmetrics_attribution", JSON.stringify(attribution));
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    const stored = localStorage.getItem("souqmetrics_attribution");
+    if (!stored) return;
+
+    fetch("/cart/update.js", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        attributes: {
+          souqmetrics_channel: stored
+        }
+      })
+    });
+  });
+
+})();
+</script>
+
+{% schema %}
+{
+  "name": "SouqMetrics Attribution",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}
