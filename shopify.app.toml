@@ -36,5 +36,5 @@ redirect_urls = [
 ]
 
 [app_preferences]
-url = "https://app.souqmetrics.co/#/overview"
+url = "https://app.souqmetrics.co/overview"
 
