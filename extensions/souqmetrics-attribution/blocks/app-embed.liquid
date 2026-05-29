@@ -1,65 +1,131 @@
 <script>
 (function () {
+  var TRACK_URL = "https://frgzxxszpzclhnkgmkuw.supabase.co/functions/v1/track-funnel-event";
+  var storeDomain = window.location.hostname.replace(/^www\./, "");
 
-  function getParam(name) {
-    const url = new URL(window.location.href);
-    return url.searchParams.get(name);
+  // ── Session ID (persists 30 min) ───────────────────────────────────────────
+  function getSessionId() {
+    var key = "sm_session";
+    try {
+      var raw = sessionStorage.getItem(key);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (Date.now() - parsed.ts < 30 * 60 * 1000) return parsed.id;
+      }
+      var id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      sessionStorage.setItem(key, JSON.stringify({ id: id, ts: Date.now() }));
+      return id;
+    } catch (e) { return "nosession"; }
   }
 
-  const params = {
-    utm_source: getParam("utm_source"),
-    utm_medium: getParam("utm_medium"),
+  // ── Send funnel event ──────────────────────────────────────────────────────
+  function track(event_type, product_id, product_name) {
+    var payload = {
+      store_domain: storeDomain,
+      event_type: event_type,
+      session_id: getSessionId(),
+      product_id: product_id || null,
+      product_name: product_name || null
+    };
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(TRACK_URL, new Blob([JSON.stringify(payload)], { type: "application/json" }));
+      } else {
+        fetch(TRACK_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), keepalive: true });
+      }
+    } catch (e) {}
+  }
+
+  // ── Attribution (unchanged) ────────────────────────────────────────────────
+  function getParam(name) {
+    return new URL(window.location.href).searchParams.get(name);
+  }
+  var params = {
+    utm_source:   getParam("utm_source"),
+    utm_medium:   getParam("utm_medium"),
     utm_campaign: getParam("utm_campaign"),
-    utm_content: getParam("utm_content"),
-    utm_term: getParam("utm_term"),
-    gclid: getParam("gclid"),
-    fbclid: getParam("fbclid"),
-    ttclid: getParam("ttclid")
+    utm_content:  getParam("utm_content"),
+    utm_term:     getParam("utm_term"),
+    gclid:        getParam("gclid"),
+    fbclid:       getParam("fbclid"),
+    ttclid:       getParam("ttclid")
   };
-
-  // Detect platform automatically if no utm_source
-  let detectedSource = params.utm_source;
-
+  var detectedSource = params.utm_source;
   if (!detectedSource) {
-    if (params.gclid) detectedSource = "google";
+    if (params.gclid)       detectedSource = "google";
     else if (params.fbclid) detectedSource = "meta";
     else if (params.ttclid) detectedSource = "tiktok";
   }
-
-  const attribution = {
-    source: detectedSource || null,
-    medium: params.utm_medium || null,
+  var attribution = {
+    source:   detectedSource      || null,
+    medium:   params.utm_medium   || null,
     campaign: params.utm_campaign || null,
-    content: params.utm_content || null,
-    term: params.utm_term || null,
-    gclid: params.gclid || null,
-    fbclid: params.fbclid || null,
-    ttclid: params.ttclid || null
+    content:  params.utm_content  || null,
+    term:     params.utm_term     || null,
+    gclid:    params.gclid        || null,
+    fbclid:   params.fbclid       || null,
+    ttclid:   params.ttclid       || null
   };
-
-  // Only store if something meaningful exists
   if (attribution.source || attribution.gclid || attribution.fbclid || attribution.ttclid) {
     localStorage.setItem("souqmetrics_attribution", JSON.stringify(attribution));
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    const stored = localStorage.getItem("souqmetrics_attribution");
-    if (!stored) return;
 
-    fetch("/cart/update.js", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        attributes: {
-          souqmetrics_channel: stored
-        }
-      })
+    // ── Push attribution to cart (unchanged) ──────────────────────────────
+    var stored = localStorage.getItem("souqmetrics_attribution");
+    if (stored) {
+      fetch("/cart/update.js", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attributes: { souqmetrics_channel: stored } })
+      });
+    }
+
+    // ── Page view (product pages only) ────────────────────────────────────
+    if (window.location.pathname.indexOf("/products/") !== -1) {
+      var productName = null;
+      var productId   = null;
+      if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
+        productId   = String(window.ShopifyAnalytics.meta.product.id);
+        productName = window.ShopifyAnalytics.meta.product.title || null;
+      }
+      if (!productName) {
+        var h1 = document.querySelector("h1");
+        if (h1) productName = h1.innerText.trim();
+      }
+      track("page_view", productId, productName);
+    }
+
+    // ── Checkout ──────────────────────────────────────────────────────────
+    if (window.location.pathname.indexOf("/checkout") !== -1) {
+      track("checkout", null, null);
+    }
+
+    // ── Add to cart — Shopify cart:add event ──────────────────────────────
+    document.addEventListener("cart:add", function (e) {
+      var item = e && e.detail && e.detail.product ? e.detail.product : null;
+      track("add_to_cart", item ? String(item.id) : null, item ? (item.title || null) : null);
     });
-  });
 
+    // ── Add to cart — fetch /cart/add.js fallback ─────────────────────────
+    var origFetch = window.fetch;
+    window.fetch = function (url, opts) {
+      if (typeof url === "string" && url.indexOf("/cart/add") !== -1) {
+        try {
+          var body = opts && opts.body ? JSON.parse(opts.body) : null;
+          if (body) {
+            var pid = body.id ? String(body.id) : null;
+            track("add_to_cart", pid, null);
+          }
+        } catch (e) {}
+      }
+      return origFetch.apply(this, arguments);
+    };
+
+  });
 })();
 </script>
-
 {% schema %}
 {
   "name": "SouqMetrics Attribution",
