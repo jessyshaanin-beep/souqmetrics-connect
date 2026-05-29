@@ -102,6 +102,12 @@
       track("checkout", null, null);
     }
 
+    // ── Purchase (thank you page) ─────────────────────────────────────────
+    if (window.location.pathname.indexOf("/thank_you") !== -1 ||
+        window.location.pathname.indexOf("/orders/") !== -1) {
+      track("purchase", null, null);
+    }
+
     // ── Add to cart — Shopify cart:add event ──────────────────────────────
     document.addEventListener("cart:add", function (e) {
       var item = e && e.detail && e.detail.product ? e.detail.product : null;
