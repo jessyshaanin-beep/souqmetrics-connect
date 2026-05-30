@@ -1,10 +1,12 @@
-const { PrismaClient } = require("@prisma/client");
+import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function run() {
   const sessions = await prisma.session.findMany({
     where: { isOnline: false }
   });
+
+  console.log(`Found ${sessions.length} offline session(s)`);
 
   for (const session of sessions) {
     console.log("Activating pixel for", session.shop);
