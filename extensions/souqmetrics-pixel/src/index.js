@@ -35,7 +35,7 @@ register(({ analytics, browser }) => {
     );
   });
 
-  analytics.subscribe("order_completed", async (event) => {
+  analytics.subscribe("checkout_completed", async (event) => {
     await browser.sendBeacon(
       TRACK_URL,
       JSON.stringify({
