@@ -5,5 +5,3 @@ runtime_context = "strict"
 
 [settings]
 type = "object"
-
-[settings.fields]
