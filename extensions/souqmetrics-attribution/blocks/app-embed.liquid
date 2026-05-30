@@ -3,7 +3,6 @@
   var TRACK_URL = "https://frgzxxszpzclhnkgmkuw.supabase.co/functions/v1/track-funnel-event";
   var storeDomain = window.location.hostname.replace(/^www\./, "");
 
-  // ── Session ID (persists 30 min) ───────────────────────────────────────────
   function getSessionId() {
     var key = "sm_session";
     try {
@@ -18,7 +17,6 @@
     } catch (e) { return "nosession"; }
   }
 
-  // ── Send funnel event ──────────────────────────────────────────────────────
   function track(event_type, product_id, product_name) {
     var payload = JSON.stringify({
       store_domain: storeDomain,
@@ -28,7 +26,6 @@
       product_name: product_name || null
     });
     try {
-      // Use XMLHttpRequest to avoid Facebook Pixel patching fetch with credentials
       var xhr = new XMLHttpRequest();
       xhr.open("POST", TRACK_URL, true);
       xhr.setRequestHeader("Content-Type", "application/json");
@@ -36,43 +33,86 @@
     } catch (e) {}
   }
 
-  // ── Attribution (unchanged) ────────────────────────────────────────────────
+  // ── Attribution ────────────────────────────────────────────────────────────
   function getParam(name) {
     return new URL(window.location.href).searchParams.get(name);
   }
   var params = {
-    utm_source:   getParam("utm_source"),
-    utm_medium:   getParam("utm_medium"),
-    utm_campaign: getParam("utm_campaign"),
-    utm_content:  getParam("utm_content"),
-    utm_term:     getParam("utm_term"),
-    gclid:        getParam("gclid"),
-    fbclid:       getParam("fbclid"),
-    ttclid:       getParam("ttclid")
+    utm_source: getParam("utm_source"), utm_medium: getParam("utm_medium"),
+    utm_campaign: getParam("utm_campaign"), utm_content: getParam("utm_content"),
+    utm_term: getParam("utm_term"), gclid: getParam("gclid"),
+    fbclid: getParam("fbclid"), ttclid: getParam("ttclid")
   };
   var detectedSource = params.utm_source;
   if (!detectedSource) {
-    if (params.gclid)       detectedSource = "google";
+    if (params.gclid) detectedSource = "google";
     else if (params.fbclid) detectedSource = "meta";
     else if (params.ttclid) detectedSource = "tiktok";
   }
   var attribution = {
-    source:   detectedSource      || null,
-    medium:   params.utm_medium   || null,
-    campaign: params.utm_campaign || null,
-    content:  params.utm_content  || null,
-    term:     params.utm_term     || null,
-    gclid:    params.gclid        || null,
-    fbclid:   params.fbclid       || null,
-    ttclid:   params.ttclid       || null
+    source: detectedSource || null, medium: params.utm_medium || null,
+    campaign: params.utm_campaign || null, content: params.utm_content || null,
+    term: params.utm_term || null, gclid: params.gclid || null,
+    fbclid: params.fbclid || null, ttclid: params.ttclid || null
   };
   if (attribution.source || attribution.gclid || attribution.fbclid || attribution.ttclid) {
     localStorage.setItem("souqmetrics_attribution", JSON.stringify(attribution));
   }
 
+  // ── Add to cart — fetch intercept (MUST be before DOMContentLoaded) ────────
+  var origFetch = window.fetch;
+  window.fetch = function (url, opts) {
+    if (typeof url === "string" && url.indexOf("/cart/add") !== -1) {
+      try {
+        var body = opts && opts.body ? JSON.parse(opts.body) : null;
+        if (body) {
+          var pid = body.id ? String(body.id) : (body.items && body.items[0] ? String(body.items[0].id) : null);
+          var pname = null;
+          if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
+            pname = window.ShopifyAnalytics.meta.product.title || null;
+          }
+          if (!pname) {
+            var h1 = document.querySelector("h1");
+            if (h1) pname = h1.innerText.trim() || null;
+          }
+          track("add_to_cart", pid, pname);
+        }
+      } catch (e) {}
+    }
+    return origFetch.apply(this, arguments);
+  };
+
+  // ── Add to cart — XHR intercept fallback ──────────────────────────────────
+  var origOpen = XMLHttpRequest.prototype.open;
+  var origSend = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.open = function (method, url) {
+    this._smUrl = url;
+    return origOpen.apply(this, arguments);
+  };
+  XMLHttpRequest.prototype.send = function (body) {
+    if (this._smUrl && this._smUrl.indexOf("/cart/add") !== -1) {
+      try {
+        var parsed = typeof body === "string" ? JSON.parse(body) : null;
+        if (parsed) {
+          var pid = parsed.id ? String(parsed.id) : (parsed.items && parsed.items[0] ? String(parsed.items[0].id) : null);
+          var pname = null;
+          if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
+            pname = window.ShopifyAnalytics.meta.product.title || null;
+          }
+          if (!pname) {
+            var h1 = document.querySelector("h1");
+            if (h1) pname = h1.innerText.trim() || null;
+          }
+          track("add_to_cart", pid, pname);
+        }
+      } catch (e) {}
+    }
+    return origSend.apply(this, arguments);
+  };
+
   document.addEventListener("DOMContentLoaded", function () {
 
-    // ── Push attribution to cart (unchanged) ──────────────────────────────
+    // ── Push attribution to cart ───────────────────────────────────────────
     var stored = localStorage.getItem("souqmetrics_attribution");
     if (stored) {
       fetch("/cart/update.js", {
@@ -84,8 +124,7 @@
 
     // ── Page view (product pages only) ────────────────────────────────────
     if (window.location.pathname.indexOf("/products/") !== -1) {
-      var productName = null;
-      var productId   = null;
+      var productId = null, productName = null;
       if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
         productId   = String(window.ShopifyAnalytics.meta.product.id);
         productName = window.ShopifyAnalytics.meta.product.title || null;
@@ -97,41 +136,16 @@
       track("page_view", productId, productName);
     }
 
-    // ── Checkout ──────────────────────────────────────────────────────────
-    if (window.location.pathname.indexOf("/checkout") !== -1) {
-      track("checkout", null, null);
-    }
-
-    // ── Purchase (thank you page) ─────────────────────────────────────────
-    if (window.location.pathname.indexOf("/thank_you") !== -1 ||
-        window.location.pathname.indexOf("/orders/") !== -1) {
-      track("purchase", null, null);
-    }
-
-    // ── Add to cart — Shopify cart:add event ──────────────────────────────
+    // ── cart:add event (some themes emit this) ─────────────────────────────
     document.addEventListener("cart:add", function (e) {
       var item = e && e.detail && e.detail.product ? e.detail.product : null;
-      track("add_to_cart", item ? String(item.id) : null, item ? (item.title || null) : null);
-    });
-
-    // ── Add to cart — fetch /cart/add.js fallback ─────────────────────────
-    var origFetch = window.fetch;
-    window.fetch = function (url, opts) {
-      if (typeof url === "string" && url.indexOf("/cart/add") !== -1) {
-        try {
-          var body = opts && opts.body ? JSON.parse(opts.body) : null;
-          if (body) {
-            var pid = body.id ? String(body.id) : null;
-            var pname = null;
-            if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
-              pname = window.ShopifyAnalytics.meta.product.title || null;
-            }
-            track("add_to_cart", pid, pname);
-          }
-        } catch (e) {}
+      var pid   = item ? String(item.id)    : null;
+      var pname = item ? (item.title || null) : null;
+      if (!pname && window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
+        pname = window.ShopifyAnalytics.meta.product.title || null;
       }
-      return origFetch.apply(this, arguments);
-    };
+      track("add_to_cart", pid, pname);
+    });
 
   });
 })();
