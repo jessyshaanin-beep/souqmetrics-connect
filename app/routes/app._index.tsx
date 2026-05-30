@@ -10,8 +10,19 @@ import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
-
+  const { admin } = await authenticate.admin(request);
+  try {
+    await admin.graphql(`
+      mutation {
+        webPixelCreate(webPixel: { settings: "{}" }) {
+          webPixel { id }
+          userErrors { field message }
+        }
+      }
+    `);
+  } catch (e) {
+    // already exists, ignore
+  }
   return null;
 };
 
