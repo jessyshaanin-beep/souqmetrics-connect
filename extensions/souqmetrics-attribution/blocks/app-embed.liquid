@@ -122,7 +122,11 @@
           var body = opts && opts.body ? JSON.parse(opts.body) : null;
           if (body) {
             var pid = body.id ? String(body.id) : null;
-            track("add_to_cart", pid, null);
+            var pname = null;
+            if (window.ShopifyAnalytics && window.ShopifyAnalytics.meta && window.ShopifyAnalytics.meta.product) {
+              pname = window.ShopifyAnalytics.meta.product.title || null;
+            }
+            track("add_to_cart", pid, pname);
           }
         } catch (e) {}
       }
