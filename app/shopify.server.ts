@@ -19,6 +19,23 @@ const shopify = shopifyApp({
   future: {
     expiringOfflineAccessTokens: true,
   },
+  hooks: {
+    afterAuth: async ({ session, admin }) => {
+      try {
+        await admin.graphql(`
+          mutation {
+            webPixelCreate(webPixel: { settings: "{}" }) {
+              webPixel { id }
+              userErrors { field message }
+            }
+          }
+        `);
+        console.log("[SouqMetrics] Web pixel activated for", session.shop);
+      } catch (e) {
+        console.error("[SouqMetrics] Web pixel activation failed", e);
+      }
+    }
+  },
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
     : {}),
