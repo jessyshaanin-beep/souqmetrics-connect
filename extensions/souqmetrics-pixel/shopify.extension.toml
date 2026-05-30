@@ -1,0 +1,9 @@
+name = "souqmetrics-pixel"
+uid = "c729006b-513b-fb7c-540f-a36cc8c7707be9a71963"
+type = "web_pixel"
+runtime_context = "strict"
+
+[settings]
+type = "object"
+
+[settings.fields]
