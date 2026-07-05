@@ -114,8 +114,7 @@
 
     // ── Push attribution to cart ───────────────────────────────────────────
     var stored = localStorage.getItem("souqmetrics_attribution");
-    var hasCurrentSessionAttribution = attribution.source || attribution.gclid || attribution.fbclid || attribution.ttclid;
-    if (stored && hasCurrentSessionAttribution) {
+    if (stored) {
       fetch("/cart/update.js", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
