@@ -12,7 +12,30 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin } = await authenticate.admin(request);
   try {
-    await admin.graphql(`
+    // First check if pixel already exists
+    const existingRes = await admin.graphql(`
+      query {
+        webPixels(first: 5) {
+          edges {
+            node {
+              id
+              settings
+            }
+          }
+        }
+      }
+    `);
+    const existingData = await existingRes.json();
+    const existingPixels = existingData?.data?.webPixels?.edges || [];
+    console.log("[SouqMetrics] Existing pixels:", JSON.stringify(existingPixels));
+
+    if (existingPixels.length > 0) {
+      console.log("[SouqMetrics] Pixel already exists, skipping creation");
+      return null;
+    }
+
+    // No pixel exists — create one
+    const pixelResponse = await admin.graphql(`
       mutation {
         webPixelCreate(webPixel: { settings: "{}" }) {
           webPixel { id }
@@ -20,8 +43,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
       }
     `);
+    const pixelData = await pixelResponse.json();
+    const pixelErrors = pixelData?.data?.webPixelCreate?.userErrors;
+    if (pixelErrors?.length) {
+      console.log("[SouqMetrics] Pixel userErrors:", JSON.stringify(pixelErrors));
+    } else {
+      console.log("[SouqMetrics] Pixel created:", pixelData?.data?.webPixelCreate?.webPixel?.id);
+    }
   } catch (e) {
-    // already exists, ignore
+    console.error("[SouqMetrics] Pixel creation failed:", e);
   }
   return null;
 };
