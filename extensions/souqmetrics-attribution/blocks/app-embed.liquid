@@ -41,7 +41,8 @@
     utm_source: getParam("utm_source"), utm_medium: getParam("utm_medium"),
     utm_campaign: getParam("utm_campaign"), utm_content: getParam("utm_content"),
     utm_term: getParam("utm_term"), gclid: getParam("gclid"),
-    fbclid: getParam("fbclid"), ttclid: getParam("ttclid")
+    fbclid: getParam("fbclid"), ttclid: getParam("ttclid"),
+    sqm_cid: getParam("sqm_cid")
   };
   var detectedSource = params.utm_source;
   if (!detectedSource) {
@@ -53,7 +54,8 @@
     source: detectedSource || null, medium: params.utm_medium || null,
     campaign: params.utm_campaign || null, content: params.utm_content || null,
     term: params.utm_term || null, gclid: params.gclid || null,
-    fbclid: params.fbclid || null, ttclid: params.ttclid || null
+    fbclid: params.fbclid || null, ttclid: params.ttclid || null,
+    sqm_cid: params.sqm_cid || null
   };
   if (attribution.source || attribution.gclid || attribution.fbclid || attribution.ttclid) {
     localStorage.setItem("souqmetrics_attribution", JSON.stringify(attribution));
